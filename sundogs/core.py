@@ -49,7 +49,7 @@ def check_anomaly(sample, entries, std_multiply, chart_value='max'):
 
 def load_settings():
     logging.info("Validating settings.yaml")
-    c = Core(source_file="settings.yaml", schema_files=["schema.yaml"])
+    c = Core(source_file="config/settings.yaml", schema_files=["config/schema.yaml"])
     settings = c.validate(raise_exception=True)
 
     for probe_settings in settings["probes"]:
