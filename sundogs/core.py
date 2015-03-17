@@ -3,48 +3,10 @@
 
 import logging
 import queries
+import logics
+
 from pykwalify.core import Core
-
-from math import sqrt
 from elasticsearch import Elasticsearch
-
-
-def connect_to_es(ip):
-    return Elasticsearch(ip)
-
-
-def get_stats(settings, conn):
-    conn.ping()
-
-    query = queries.get_data_histogram_query(settings['time_aggregator'],
-                                             settings['time_window'],
-                                             settings["must"],
-                                             settings["must_not"],
-                                             settings["should"])
-    res = conn.search(index="today", body=query)
-    return res['aggregations']['events_by_date']['buckets']
-
-
-def check_anomaly(sample, entries, std_multiply, chart_value='max'):
-    n = 0
-    mean = 0
-    m2 = 0
-    max_value = None
-    for entry in entries:
-        value = entry['stats_0'][chart_value]
-        n += 1
-        delta = value - mean
-        mean += delta / n
-        m2 += delta * (value - mean)
-        max_value = max(max_value, value)
-    variance = m2 / (n - 1)
-    std = sqrt(variance)
-    logging.info("sample: %s std : %s, mean : %s, max: %s, lol: %s" %
-                 (sample['stats_0'][chart_value], std, mean, max_value, mean + 3 * std))
-    if sample['stats_0'][chart_value] > mean + std_multiply * std:
-        return sample
-    else:
-        return False
 
 
 def load_settings():
@@ -66,19 +28,37 @@ def set_logging():
     logging.getLogger("paramiko").setLevel(logging.WARNING)
     logging.getLogger("elasticsearch").setLevel(logging.WARNING)
     logging.getLogger("urllib3").setLevel(logging.WARNING)
+    logging.getLogger("pykwalify").setLevel(logging.WARNING)
     logging.basicConfig(level=logging.DEBUG, datefmt='%H:%M:%S',
                         format='[%(asctime)s] {%(name)10s:%(lineno)3d} %(levelname)8s - %(message)s')
+
+
+def query(conn, settings, window, must):
+    return conn.search(index="_all",
+                       search_type="count",
+                       body=queries.get_count_query(window,
+                                                    must,
+                                                    settings["must_not"],
+                                                    settings["should"]))["hits"]["total"]
 
 
 def main():
     set_logging()
     settings = load_settings()
-    conn = connect_to_es(settings['settings']['es_host'])
-
+    conn = Elasticsearch(settings['settings']['es_host'])
+    assert conn.ping(), "Cannot connect to ES host"
     for probe_settings in settings['probes']:
-        stats = get_stats(probe_settings, conn)
-        for test in xrange(1, probe_settings["times_to_run"] + 1):
-            sample = stats[-test]
-            data = stats[:-test]
-            std_multiply = probe_settings["std_multiply"]
-            print check_anomaly(sample, data, std_multiply)
+        if probe_settings["type"] == "rate":
+            training_window_events_count = query(conn, probe_settings, probe_settings["norm_window"],
+                                                 probe_settings["must"])
+            training_window_positives_count = query(conn, probe_settings, probe_settings["norm_window"],
+                                                    probe_settings["must"] + probe_settings["positive"])
+            current_window_count = query(conn, probe_settings, probe_settings["current_window"], probe_settings["must"])
+            current_window_positives_count = query(conn, probe_settings, probe_settings["current_window"],
+                                                   probe_settings["must"] + probe_settings["positive"])
+            training_window_events_count -= current_window_count
+            training_window_positives_count -= current_window_positives_count
+            print logics.alert_rate_change(training_window_events_count, training_window_positives_count,
+                                           current_window_count,
+                                           current_window_positives_count)
+
