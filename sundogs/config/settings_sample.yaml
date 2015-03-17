@@ -1,0 +1,19 @@
+settings:
+  es_host: localhost
+  es_port: 9200
+
+probes:
+    - name: redis-latency
+      time_aggregator: 1m
+      value_fields: max
+      std_multiply: 3
+      times_to_run: 3
+      time_window: 6h
+      must:
+        - key: environment
+          value: prod
+        - key: plugin
+          value: read_latency
+      must_not:
+        - key: list_name
+          value: test

@@ -14,25 +14,28 @@ mapping:
     sequence:
       - type:    map
         mapping:
-          "time_aggregator":
-            type:      str
-            required:  yes
           "name":
             type:      str
             required:  yes
             unique:    yes
-          "value_fields":
+          "norm_window":
             type:      str
             required:  yes
-          "time_window":
+          "current_window":
             type:      str
             required:  yes
-          "std_multiply":
-            type:      int
+          "type":
+            type:      str
             required:  yes
-          "times_to_run":
-            type:      int
-            required:  yes
+          "positive":
+            type:      seq
+            sequence:
+              - type:    map
+                mapping:
+                  "key":
+                    type:     str
+                  "value":
+                    type:     str
           "must":
             type:      seq
             sequence:
