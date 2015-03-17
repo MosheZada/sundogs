@@ -1,0 +1,22 @@
+settings:
+  es_host: monitor.forter.com
+  es_port: 9200
+
+probes:
+    - name: vt_realtime
+      norm_window: 30d
+      current_window: 24h
+      type: rate
+      positive:
+        - key: decisionMethod.raw
+          value: no score, redis policy
+      must:
+        - key: branch.raw
+          value: prod
+        - key: subservice.raw
+          value: "gate answer to merchant."
+      must_not:
+        - key: siteNumber.raw
+          value: "3"
+        - key: siteNumber.raw
+          value: "2"

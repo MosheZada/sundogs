@@ -8,5 +8,5 @@ setup(
     license='',
     author='Moshe Zada',
     author_email='moshe@forter.com',
-    description='', requires=['pykwalify', 'elasticsearch']
+    description='', requires=['pykwalify', 'elasticsearch', 'numpy', 'scipy']
 )
